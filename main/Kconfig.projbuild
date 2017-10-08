@@ -1,0 +1,28 @@
+menu "Example Configuration"
+
+config HUMIDITY_GPIO
+    int "HUMIDITY and temperature GPIO number"
+	range 0 39
+	default 5
+	help
+		GPIO number (IOxx) to get humidity and temperature from.
+
+		Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to connect sensors to.
+
+		GPIOs 35-39 are input-only.
+
+config WIFI_SSID
+    string "WiFi SSID"
+	default "myssid"
+	help
+		SSID (network name) for the example to connect to.
+
+config WIFI_PASSWORD
+    string "WiFi Password"
+	default "myssid"
+	help
+		WiFi password (WPA or WPA2) for the example to use.
+
+		Can be left blank if the network has no security set.
+
+endmenu

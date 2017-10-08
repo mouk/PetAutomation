@@ -1,0 +1,34 @@
+.config
+*.o
+*.pyc
+
+# gtags
+GTAGS
+GRTAGS
+GPATH
+
+# emacs
+.dir-locals.el
+
+# emacs temp file suffixes
+*~
+.#*
+\#*#
+
+# eclipse setting
+.settings
+
+# Example project files
+**/sdkconfig
+**/sdkconfig.old
+**/build
+
+# AWS IoT Examples require device-specific certs/keys
+examples/protocols/aws_iot/*/main/certs/*.pem.*
+
+# gcov coverage reports
+*.gcda
+*.gcno
+coverage.info
+coverage_report/
+/.DS_Store
