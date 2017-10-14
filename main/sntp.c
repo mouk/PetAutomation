@@ -55,9 +55,9 @@ void getTime(EventGroupHandle_t wifi_event_group)
     ESP_LOGI(TAG, "The current date/time in central europe is: %s", strftime_buf);
 
     const int deep_sleep_sec = 60*60*24;
-    ESP_LOGI(TAG, "Entering deep sleep for %d seconds", deep_sleep_sec);
+    ESP_LOGI(TAG, "vTaskDelay for %d seconds", deep_sleep_sec);
 
-    esp_deep_sleep(1000000LL * deep_sleep_sec);
+    vTaskDelay(1000000LL * deep_sleep_sec);
 }
 
 static void obtain_time(EventGroupHandle_t wifi_event_group)
