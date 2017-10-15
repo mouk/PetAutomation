@@ -24,6 +24,7 @@
 #define HUMIDITY_GPIO CONFIG_HUMIDITY_GPIO
 #define WIFI_SSID CONFIG_WIFI_SSID
 #define WIFI_PASS CONFIG_WIFI_PASSWORD
+#define LED_BUILTIN 2
 
 static void initialise_wifi(void);
 static esp_err_t event_handler(void *ctx, system_event_t *event);
@@ -72,6 +73,18 @@ void printTemp(void *pvParameter) {
 	}
 }
 
+void blink_builtin_led(void *pvParameter) {
+	gpio_pad_select_gpio(LED_BUILTIN);
+	/* Set the GPIO as a push/pull output */
+	gpio_set_direction(LED_BUILTIN, GPIO_MODE_OUTPUT);
+	while (1) {
+		gpio_set_level(LED_BUILTIN, 1);
+		vTaskDelay(500 / portTICK_PERIOD_MS);
+		gpio_set_level(LED_BUILTIN, 0);
+		vTaskDelay(2000 / portTICK_PERIOD_MS);
+	}
+}
+
 #define V_REF   1100
 #define ADC1_TEST_CHANNEL (ADC1_CHANNEL_6)      //GPIO 34
 //#define V_REF_TO_GPIO  //Remove comment on define to route v_ref to GPIO
@@ -88,7 +101,7 @@ void get_light() {
 		voltage = adc1_to_voltage(ADC1_TEST_CHANNEL, &characteristics);
 		//measures showed min: 54, max: 1018 normalize to a percent
 		int percent = ((voltage - 54) * 100) / 964;
-		ESP_LOGI(TAG, "%d -> %d%% percent mV", voltage, percent);
+		ESP_LOGI(TAG, "%d mV -> %d%% percent", voltage, percent);
 		vTaskDelay(pdMS_TO_TICKS(1000));
 	}
 }
@@ -103,16 +116,18 @@ void app_main() {
 	 xTaskCreate(&humidity_task, "humidity_task", configMINIMAL_STACK_SIZE * 2,
 	 NULL, 5, NULL);
 	 */
-	 xTaskCreate(&getTime, "getTime", configMINIMAL_STACK_SIZE * 5,
-	 wifi_event_group, 3, NULL);
 
-	 xTaskCreate(&get_light, "get_light", configMINIMAL_STACK_SIZE * 2,
-	 wifi_event_group, 3, NULL);
+	xTaskCreate(&getTime, "getTime", configMINIMAL_STACK_SIZE * 5,
+			wifi_event_group, 3, NULL);
 
+	xTaskCreate(&get_light, "get_light", configMINIMAL_STACK_SIZE * 2,
+			wifi_event_group, 3, NULL);
 
-	 xTaskCreate(&printTemp, "printTemp", configMINIMAL_STACK_SIZE * 10,
-	 wifi_event_group, 3, NULL);
+	xTaskCreate(&printTemp, "printTemp", configMINIMAL_STACK_SIZE * 10,
+			wifi_event_group, 3, NULL);
 
+	xTaskCreate(&blink_builtin_led, "blink_builtin_led",
+			configMINIMAL_STACK_SIZE, wifi_event_group, 3, NULL);
 
 //ESP_ERROR_CHECK( esp_wifi_stop() );
 }
