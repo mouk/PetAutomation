@@ -17,6 +17,7 @@
 #include "esp_event_loop.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
+#include "esp_adc_cal.h"
 #include "constants.h"
 #include "ds18b20.h"
 
@@ -60,10 +61,9 @@ void printTemp(void *pvParameter) {
 	ESP_LOGI(TAG, "%d sensors found", sensor_count);
 	float temps[sensor_count];
 
-
 	gpio_pad_select_gpio(SENSOR_GPIO);
 	while (1) {
-		 ds18b20_measure_and_read_multi(SENSOR_GPIO, addrs, sensor_count, temps);
+		ds18b20_measure_and_read_multi(SENSOR_GPIO, addrs, sensor_count, temps);
 
 		for (uint8_t i = 0; i < sensor_count; i++) {
 			ESP_LOGI(TAG, "Sensor %d: %f", i, temps[i]);
@@ -72,19 +72,47 @@ void printTemp(void *pvParameter) {
 	}
 }
 
+#define V_REF   1100
+#define ADC1_TEST_CHANNEL (ADC1_CHANNEL_6)      //GPIO 34
+//#define V_REF_TO_GPIO  //Remove comment on define to route v_ref to GPIO
+
+void get_light() {
+	//Init ADC and Characteristics
+	esp_adc_cal_characteristics_t characteristics;
+	adc1_config_width(ADC_WIDTH_12Bit);
+	adc1_config_channel_atten(ADC1_TEST_CHANNEL, ADC_ATTEN_0db);
+	esp_adc_cal_get_characteristics(V_REF, ADC_ATTEN_0db, ADC_WIDTH_12Bit,
+			&characteristics);
+	uint32_t voltage;
+	while (1) {
+		voltage = adc1_to_voltage(ADC1_TEST_CHANNEL, &characteristics);
+		//measures showed min: 54, max: 1018 normalize to a percent
+		int percent = ((voltage - 54) * 100) / 964;
+		ESP_LOGI(TAG, "%d -> %d%% percent mV", voltage, percent);
+		vTaskDelay(pdMS_TO_TICKS(1000));
+	}
+}
+
 void app_main() {
 	ESP_ERROR_CHECK(nvs_flash_init());
 	initialise_wifi();
 
 	ESP_LOGI(TAG, "Starting tasks");
+	//get_light();
 	/*
 	 xTaskCreate(&humidity_task, "humidity_task", configMINIMAL_STACK_SIZE * 2,
 	 NULL, 5, NULL);
+	 */
 	 xTaskCreate(&getTime, "getTime", configMINIMAL_STACK_SIZE * 5,
 	 wifi_event_group, 3, NULL);
-	 */
-	xTaskCreate(&printTemp, "printTemp", configMINIMAL_STACK_SIZE * 10,
-			wifi_event_group, 3, NULL);
+
+	 xTaskCreate(&get_light, "get_light", configMINIMAL_STACK_SIZE * 2,
+	 wifi_event_group, 3, NULL);
+
+
+	 xTaskCreate(&printTemp, "printTemp", configMINIMAL_STACK_SIZE * 10,
+	 wifi_event_group, 3, NULL);
+
 
 //ESP_ERROR_CHECK( esp_wifi_stop() );
 }
@@ -98,7 +126,7 @@ static void initialise_wifi(void) {
 	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 	wifi_config_t wifi_config = { .sta = { .ssid = WIFI_SSID, .password =
-			WIFI_PASS, }, };
+	WIFI_PASS, }, };
 
 	ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
