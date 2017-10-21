@@ -8,6 +8,6 @@
 #ifndef MAIN_SNTP_H_
 #define MAIN_SNTP_H_
 
-void getTime();
+void get_time();
 
 #endif /* MAIN_SNTP_H_ */
