@@ -49,10 +49,13 @@ static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 			ESP_LOGI(TAG, "GET");
 			http_serve_start_page(nc);
 		} else {
-
 			ESP_LOGI(TAG, "POST");
 			http_serve_start_page(nc);
 		}
+		break;
+	}
+	case MG_EV_SEND:{
+		printf("MG_EV_SEND %p\n", nc);
 		break;
 	}
 	case MG_EV_CLOSE: {
@@ -113,12 +116,13 @@ void http_save_wifi_credentials(struct mg_connection *nc, int ev, void *ev_data)
 					"Connection: close\r\n"
 					"Content-Type: text/html\r\n"
 					"\r\n"
-					"<html><head><meta http-equiv=\"refresh\" content=\"30;url=http://www.google.com/\" /></head>"
-					"<body><h1>Connecting to %s. You will be redirected in 30 seconds...</h1></body></html>";
+					"<html><head><meta http-equiv=\"refresh\" content=\"20;url=http://www.google.com/\" /></head>"
+					"<body><h1>Connecting to %s. You will be redirected in 20 seconds...</h1></body></html>";
 	mg_printf(nc, redirect_fmt, ssid);
-	nc->flags |= MG_F_SEND_AND_CLOSE;
 
-	vTaskDelay(400 / portTICK_PERIOD_MS);
+	nc->flags |= MG_F_SEND_AND_CLOSE;
+	ESP_LOGI(TAG, "Waiting few second");
+	ets_delay_us(300);
 
 	ESP_LOGI(TAG, "Switching to new AP");
 	set_wifi_sta_and_start(ssid, password);

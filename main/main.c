@@ -20,6 +20,7 @@
 #include "ds18b20.h"
 #include "mongoose_server.h"
 #include "wifi_manager.h"
+
 #define HUMIDITY_GPIO CONFIG_HUMIDITY_GPIO
 #define LED_BUILTIN 2
 
@@ -99,12 +100,24 @@ void get_light() {
 	}
 }
 
+void print_system_information() {
+	ESP_LOGI(TAG,  "SDK version: %s", esp_get_idf_version());
+	while (1) {
+		ESP_LOGI(TAG,  "Free heap size: %u bytes", esp_get_free_heap_size());
+		vTaskDelay(pdMS_TO_TICKS(1000 * 10));
+	}
+}
+
 void app_main() {
+	setlocale(LC_ALL, "");
+
 	ESP_ERROR_CHECK(nvs_flash_init());
 	//initialise_wifi();
+	ESP_LOGI(TAG, "Starting tasks");
+	xTaskCreate(&print_system_information, "print_system_information",
+				1024 * 2, NULL, 1, NULL);
 	wifi_start_soft_ap();
 
-	ESP_LOGI(TAG, "Starting tasks");
 
 	xTaskCreate(&get_time, "get_time", configMINIMAL_STACK_SIZE * 5,
 			event_group, 3, NULL);

@@ -22,7 +22,7 @@
 #define DS18B20_FAMILY_ID 0x28
 #define DS18S20_FAMILY_ID 0x10
 
-#define DS18B20_DEBUG
+
 #ifdef DS18B20_DEBUG
 #define debug(fmt, ...) ESP_LOGI("DS18B20", fmt, ## __VA_ARGS__);
 #else
