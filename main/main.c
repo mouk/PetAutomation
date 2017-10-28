@@ -109,14 +109,12 @@ void print_system_information() {
 }
 
 void app_main() {
-	setlocale(LC_ALL, "");
-
 	ESP_ERROR_CHECK(nvs_flash_init());
-	//initialise_wifi();
+	initialise_wifi();
 	ESP_LOGI(TAG, "Starting tasks");
 	xTaskCreate(&print_system_information, "print_system_information",
 				1024 * 2, NULL, 1, NULL);
-	wifi_start_soft_ap();
+	//wifi_start_soft_ap();
 
 
 	xTaskCreate(&get_time, "get_time", configMINIMAL_STACK_SIZE * 5,

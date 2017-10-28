@@ -66,7 +66,6 @@ static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 }
 
 void http_serve(void *pvParameters) {
-
 	/* Starting Mongoose */
 	struct mg_mgr mgr;
 	struct mg_connection *nc;
@@ -100,7 +99,6 @@ void http_serve_start_page(struct mg_connection *nc) {
 			HTTP_FORM_END, HTTP_SAVED, HTTP_END);
 	mg_send_http_chunk(nc, "", 0);
 }
-
 void http_save_wifi_credentials(struct mg_connection *nc, int ev, void *ev_data) {
 
 	char ssid[32], password[64];
@@ -126,12 +124,22 @@ void http_save_wifi_credentials(struct mg_connection *nc, int ev, void *ev_data)
 
 	ESP_LOGI(TAG, "Switching to new AP");
 	set_wifi_sta_and_start(ssid, password);
-	EventBits_t result = xEventGroupWaitBits(event_group, STA_CONNECTED_BIT,
-	false, true, (30 * 1000) / portTICK_PERIOD_MS);
-	ESP_LOGI(TAG, "Connecting result %d", result);
 
-	if (result & STA_CONNECTED_BIT) {
-		ESP_LOGI(TAG, "Closing soft ap");
+	ESP_LOGI(TAG, "set_wifi_sta_and_start existed");
+	ESP_LOGI(TAG, "Waiting for STA_CONNECTED_BIT | STA_CONNECTION_ERR_BIT");
+	EventBits_t wifi_bits = xEventGroupWaitBits(event_group,
+	STA_CONNECTED_BIT /*| STA_CONNECTION_ERR_BIT*/,
+		false, false, pdMS_TO_TICKS(10 * 1000));
+	ESP_LOGI(TAG, "Waiting for STA_CONNECTED_BIT | STA_CONNECTION_ERR_BIT returned: %u", wifi_bits);
+
+	//For some reason doesn'T work. Let's just reboot
+	/*
+	if (wifi_bits & STA_CONNECTED_BIT) {
+		ESP_LOGI(TAG, "Setting wifi credentials was successful.")
 		wifi_stop_soft_ap();
+	}else{
+		wifi_stop_sta();
 	}
+	*/
+	esp_restart();
 }

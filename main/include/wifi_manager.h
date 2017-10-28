@@ -15,9 +15,9 @@
 
 
 void initialise_wifi(void);
-esp_err_t wifi_start_soft_ap();
-esp_err_t set_wifi_sta_and_start(char *ssid, char *password);
+void set_wifi_sta_and_start(char *ssid, char *password);
 void wifi_stop_soft_ap();
+void wifi_stop_sta();
 
 EventGroupHandle_t event_group;
 #endif /* MAIN_INCLUDE_WIFI_MANAGER
