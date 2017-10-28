@@ -8,8 +8,8 @@
 #include "wifi_manager.h"
 #include "esp_event_loop.h"
 #include "esp_wifi.h"
-
 #include "esp_log.h"
+#include "freertos/timers.h"
 
 #define CONFIG_AP_SSID "PetAutomation"
 #define CONFIG_AP_PASSWORD "PetAutomation"
@@ -23,20 +23,21 @@ static esp_err_t event_handler(void *ctx, system_event_t *event);
 static esp_err_t last_connection_err = ESP_OK;
 static void wifi_start_soft_ap();
 static void WIFI_ERROR_CHECK(esp_err_t ret);
+static void create_timer_to_stop_ap(void);
 
 void initialise_wifi(void) {
 	tcpip_adapter_init();
 	event_group = xEventGroupCreate();
 	ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
-	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT()	;
+	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 	EventBits_t wifi_bits = xEventGroupWaitBits(event_group,
-	STA_CONNECTED_BIT ,//| STA_CONNECTION_ERR_BIT,
-	false, false, pdMS_TO_TICKS(20 * 1000));
+	STA_CONNECTED_BIT, //| STA_CONNECTION_ERR_BIT,
+			false, false, pdMS_TO_TICKS(20 * 1000));
 
 	if ((wifi_bits & STA_CONNECTED_BIT) == 0) {
 		ESP_LOGI(TAG,
@@ -52,8 +53,8 @@ void set_wifi_sta_and_start(char s[32], char p[64]) {
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	wifi_config_t sta_config;
 
-	 memset(sta_config.sta.ssid, 0, sizeof sta_config.sta.ssid);
-	 memset(sta_config.sta.password, 0, sizeof sta_config.sta.password);
+	memset(sta_config.sta.ssid, 0, sizeof sta_config.sta.ssid);
+	memset(sta_config.sta.password, 0, sizeof sta_config.sta.password);
 	strcpy((char *) sta_config.sta.ssid, s);
 	strcpy((char *) sta_config.sta.password, p);
 
@@ -107,8 +108,8 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 		/* This is a workaround as ESP32 WiFi libs don't currently
 		 auto-reassociate. */
 		ESP_LOGI(TAG, "SYSTEM_EVENT_STA_DISCONNECTED: SSID: %s reason: %u",
-				(char *) &event->event_info.disconnected.ssid,
-				(unsigned char)&event->event_info.disconnected.reason)
+				(char * ) &event->event_info.disconnected.ssid,
+				(unsigned char )&event->event_info.disconnected.reason)
 		;
 		WIFI_ERROR_CHECK(esp_wifi_connect());
 		xEventGroupClearBits(event_group, STA_CONNECTED_BIT);
@@ -141,6 +142,7 @@ static void wifi_start_soft_ap() {
 	ESP_ERROR_CHECK(esp_wifi_start());
 
 	ESP_LOGI(TAG, "Starting access point, SSID=%s\n", CONFIG_AP_SSID);
+	create_timer_to_stop_ap();
 }
 
 void wifi_stop_soft_ap() {
@@ -156,10 +158,28 @@ void wifi_stop_sta() {
 	wifi_mode &= (!WIFI_MODE_STA);
 	ESP_ERROR_CHECK(esp_wifi_set_mode(wifi_mode));
 }
-
+static void v_stop_ap_callback(TimerHandle_t xTimer) {
+	ESP_LOGI(TAG, "Time expired");
+	configASSERT(xTimer);
+	xTimerStop(xTimer, 0);
+	wifi_stop_soft_ap();
+}
+static TimerHandle_t ap_timer;
+static void create_timer_to_stop_ap(void) {
+	ESP_LOGI(TAG, "Creating timer to stop softAP");
+	ap_timer = xTimerCreate("StopAPTimer", pdMS_TO_TICKS(1000 * SOFTAP_TIMEOUT_IN_S),
+	pdFALSE, (void *) 0, v_stop_ap_callback);
+	if (ap_timer == NULL) {
+		ESP_LOGI(TAG, "Couldn't create timer for stopping ap");
+	} else {
+		if ( xTimerStart( ap_timer, 0 ) != pdPASS) {
+			ESP_LOGI(TAG, "Couldn't activate timer for stopping ap");
+		}
+	}
+}
 
 static char *errorNumberToString(esp_err_t error) {
-	switch(error) {
+	switch (error) {
 	case ESP_OK:
 		return "OK";
 	case ESP_FAIL:

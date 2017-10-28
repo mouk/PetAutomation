@@ -104,7 +104,7 @@ void print_system_information() {
 	ESP_LOGI(TAG,  "SDK version: %s", esp_get_idf_version());
 	while (1) {
 		ESP_LOGI(TAG,  "Free heap size: %u bytes", esp_get_free_heap_size());
-		vTaskDelay(pdMS_TO_TICKS(1000 * 10));
+		vTaskDelay(pdMS_TO_TICKS(1000 * 60));
 	}
 }
 
