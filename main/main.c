@@ -1,11 +1,3 @@
-/* Blink Example
-
- This example code is in the Public Domain (or CC0 licensed, at your option.)
-
- Unless required by applicable law or agreed to in writing, this
- software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- CONDITIONS OF ANY KIND, either express or implied.
- */
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -15,14 +7,12 @@
 #include "sntp.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
-#include "esp_adc_cal.h"
-#include "constants.h"
-#include "ds18b20.h"
 #include "mongoose_server.h"
 #include "wifi_manager.h"
-
-#define HUMIDITY_GPIO CONFIG_HUMIDITY_GPIO
-#define LED_BUILTIN 2
+#include "sensors.h"
+#include "actors.h"
+#include "automation_logic.h"
+#include <time.h>
 
 static const char *TAG = "MAIN";
 
@@ -48,24 +38,6 @@ void humidity_task(void *pvParameter) {
 	}
 }
 
-void printTemp(void *pvParameter) {
-	const gpio_num_t SENSOR_GPIO = TEMP_ONEWIRE_GPIO;
-	const int MAX_SENSORS = 10;
-	ds18b20_addr_t addrs[MAX_SENSORS];
-	int sensor_count = ds18b20_scan_devices(SENSOR_GPIO, addrs, MAX_SENSORS);
-	ESP_LOGI(TAG, "%d sensors found", sensor_count);
-	float temps[sensor_count];
-
-	gpio_pad_select_gpio(SENSOR_GPIO);
-	while (1) {
-		ds18b20_measure_and_read_multi(SENSOR_GPIO, addrs, sensor_count, temps);
-
-		for (uint8_t i = 0; i < sensor_count; i++) {
-			ESP_LOGI(TAG, "Sensor %d: %f", i, temps[i]);
-		}
-		vTaskDelay(10 * 1000 / portTICK_PERIOD_MS);
-	}
-}
 
 void blink_builtin_led(void *pvParameter) {
 	gpio_pad_select_gpio(LED_BUILTIN);
@@ -79,31 +51,39 @@ void blink_builtin_led(void *pvParameter) {
 	}
 }
 
-#define V_REF   1100
-#define ADC1_TEST_CHANNEL (ADC1_CHANNEL_6)      //GPIO 34
-//#define V_REF_TO_GPIO  //Remove comment on define to route v_ref to GPIO
 
-void get_light() {
-	//Init ADC and Characteristics
-	esp_adc_cal_characteristics_t characteristics;
-	adc1_config_width(ADC_WIDTH_12Bit);
-	adc1_config_channel_atten(ADC1_TEST_CHANNEL, ADC_ATTEN_0db);
-	esp_adc_cal_get_characteristics(V_REF, ADC_ATTEN_0db, ADC_WIDTH_12Bit,
-			&characteristics);
-	uint32_t voltage;
-	while (1) {
-		voltage = adc1_to_voltage(ADC1_TEST_CHANNEL, &characteristics);
-		//measures showed min: 54, max: 1018 normalize to a percent
-		int percent = ((voltage - 54) * 100) / 964;
-		ESP_LOGI(TAG, "%d mV -> %d%% percent", voltage, percent);
-		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
-}
+//#define V_REF_TO_GPIO  //Remove comment on define to route v_ref to GPIO
 
 void print_system_information() {
 	ESP_LOGI(TAG,  "SDK version: %s", esp_get_idf_version());
 	while (1) {
 		ESP_LOGI(TAG,  "Free heap size: %u bytes", esp_get_free_heap_size());
+		vTaskDelay(pdMS_TO_TICKS(1000 * 60));
+	}
+}
+
+void sensors_actors_main_task(void *pvParameter) {
+	init_sensors();
+
+
+	while (1) {
+		sensors_reading_t sensors_reading;
+		esp_err_t sensors_ok = get_seasors_reading(&sensors_reading);
+		if(sensors_ok == ESP_OK){
+			printout_sensors_reading(&sensors_reading);
+
+			actors_state_t actors_state;
+			esp_err_t result = process_sensors_reading(&sensors_reading, &actors_state);
+			if(result == ESP_OK){
+				 printout_actors_state(&actors_state);
+				 result = apply_actors_state(&actors_state);
+				 ESP_LOGD(TAG,  "Result of apply actors state: %d", result);
+			}
+
+		}else{
+			ESP_LOGW(TAG,  "Couldn't get sensors reading");
+		}
+		//Wait for the next minute
 		vTaskDelay(pdMS_TO_TICKS(1000 * 60));
 	}
 }
@@ -114,24 +94,22 @@ void app_main() {
 	ESP_LOGI(TAG, "Starting tasks");
 	xTaskCreate(&print_system_information, "print_system_information",
 				1024 * 2, NULL, 1, NULL);
-	//wifi_start_soft_ap();
+
+	xTaskCreate(&http_serve, "http_server", 2048 * 10, NULL, 5, NULL);
 
 
 	xTaskCreate(&get_time, "get_time", configMINIMAL_STACK_SIZE * 5,
 			event_group, 3, NULL);
 
-	/*
-	 xTaskCreate(&get_light, "get_light", configMINIMAL_STACK_SIZE * 2,
+	xTaskCreate(&blink_builtin_led, "blink_builtin_led",
+			configMINIMAL_STACK_SIZE, event_group, 3, NULL);
+	 xTaskCreate(&sensors_actors_main_task, "sensors_actors_main_task", 1024 * 2,
 	 event_group, 3, NULL);
+
+	/*
 
 	 xTaskCreate(&printTemp, "printTemp", configMINIMAL_STACK_SIZE * 10,
 	 event_group, 3, NULL);
 	 */
-	xTaskCreate(&blink_builtin_led, "blink_builtin_led",
-			configMINIMAL_STACK_SIZE, event_group, 3, NULL);
-
-	xTaskCreate(&http_serve, "http_server", 2048 * 10, NULL, 5, NULL);
-
-//ESP_ERROR_CHECK( esp_wifi_stop() );
 }
 

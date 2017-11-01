@@ -8,7 +8,8 @@
 #define ONEWIRE_SKIP_ROM   0xcc
 #define ONEWIRE_SEARCH     0xf0
 
-#define debug(fmt, ...) ESP_LOGI("ONEWIRE", fmt, ## __VA_ARGS__);
+//#define debug(fmt, ...) ESP_LOGI("ONEWIRE", fmt, ## __VA_ARGS__);
+#define debug(fmt, ...)
 
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
