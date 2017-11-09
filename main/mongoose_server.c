@@ -19,12 +19,15 @@
 #include "template.h"
 #include "esp_log.h"
 #include "wifi_manager.h"
+#include "configuration.h"
 
 static const char *TAG = "MONGOOSE";
 #define MG_LISTEN_ADDR "80"
 
 void http_serve_start_page(struct mg_connection *nc);
-void http_save_wifi_credentials(struct mg_connection *nc, int ev, void *ev_data);
+static void http_save_wifi_credentials(struct mg_connection *nc, int ev,
+		void *ev_data);
+static void api_handle_lighting(struct mg_connection *nc, int ev, void *ev_data);
 
 static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 
@@ -54,7 +57,7 @@ static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 		}
 		break;
 	}
-	case MG_EV_SEND:{
+	case MG_EV_SEND: {
 		printf("MG_EV_SEND %p\n", nc);
 		break;
 	}
@@ -79,7 +82,9 @@ void http_serve(void *pvParameters) {
 		printf("Error setting up listener!\n");
 		return;
 	}
+
 	mg_register_http_endpoint(nc, "/wifisave", http_save_wifi_credentials);
+	mg_register_http_endpoint(nc, "/api/lighting", api_handle_lighting);
 	mg_set_protocol_http_websocket(nc);
 
 	/* Processing events */
@@ -87,7 +92,15 @@ void http_serve(void *pvParameters) {
 		mg_mgr_poll(&mgr, 1000);
 	}
 }
+static const char *json_fmt = "HTTP/1.0 200 OK\r\n"
+		"Connection: close\r\n"
+		"Content-Type: application/json\r\n"
+		"\r\n"
+		"%s";
 
+static const char *no_content = "HTTP/1.0 201 OK\r\n"
+		"Connection: close\r\n"
+		"\r\n";
 void http_serve_start_page(struct mg_connection *nc) {
 	//mg_printf_http_chunk(nc, "Error: %s", msg);
 	/* Send empty chunk, the end of response */
@@ -99,7 +112,34 @@ void http_serve_start_page(struct mg_connection *nc) {
 			HTTP_FORM_END, HTTP_SAVED, HTTP_END);
 	mg_send_http_chunk(nc, "", 0);
 }
-void http_save_wifi_credentials(struct mg_connection *nc, int ev, void *ev_data) {
+static void api_handle_lighting(struct mg_connection *nc, int ev, void *ev_data) {
+	ESP_LOGD(TAG, "api_handle_lighting");
+	struct http_message *hm = (struct http_message *) ev_data;
+	printf("HTTP request: (%.*s) %.*s\n", (int) hm->method.len, hm->method.p,
+			(int) hm->uri.len, hm->uri.p);
+	if (strncmp("GET", hm->method.p, hm->method.len) == 0) {
+		ESP_LOGD(TAG, "GET api_handle_lighting");
+
+		char *json_unformatted = serialize_configuration();
+		mg_printf(nc, json_fmt, json_unformatted);
+		nc->flags |= MG_F_SEND_AND_CLOSE;
+		free(json_unformatted);
+	}
+	if (strncmp("POST", hm->method.p, hm->method.len) == 0) {
+		printf("POST api_handle_lighting");
+
+		ESP_ERROR_CHECK(update_configuration_from_json(hm->body.p, hm->body.len));
+		ESP_ERROR_CHECK(persist_config());
+		mg_printf(nc, "%s", no_content);
+		nc->flags |= MG_F_SEND_AND_CLOSE;
+
+	} else {
+		ESP_LOGD(TAG, "Else api_handle_lighting");
+		nc->flags |= MG_F_SEND_AND_CLOSE;
+	}
+}
+static void http_save_wifi_credentials(struct mg_connection *nc, int ev,
+		void *ev_data) {
 
 	char ssid[32], password[64];
 	struct http_message *hm = (struct http_message *) ev_data;
@@ -129,17 +169,10 @@ void http_save_wifi_credentials(struct mg_connection *nc, int ev, void *ev_data)
 	ESP_LOGI(TAG, "Waiting for STA_CONNECTED_BIT | STA_CONNECTION_ERR_BIT");
 	EventBits_t wifi_bits = xEventGroupWaitBits(event_group,
 	STA_CONNECTED_BIT /*| STA_CONNECTION_ERR_BIT*/,
-		false, false, pdMS_TO_TICKS(10 * 1000));
-	ESP_LOGI(TAG, "Waiting for STA_CONNECTED_BIT | STA_CONNECTION_ERR_BIT returned: %u", wifi_bits);
+	false, false, pdMS_TO_TICKS(10 * 1000));
+	ESP_LOGI(TAG,
+			"Waiting for STA_CONNECTED_BIT | STA_CONNECTION_ERR_BIT returned: %u",
+			wifi_bits);
 
-	//For some reason doesn'T work. Let's just reboot
-	/*
-	if (wifi_bits & STA_CONNECTED_BIT) {
-		ESP_LOGI(TAG, "Setting wifi credentials was successful.")
-		wifi_stop_soft_ap();
-	}else{
-		wifi_stop_sta();
-	}
-	*/
 	esp_restart();
 }

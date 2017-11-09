@@ -13,6 +13,7 @@
 #include "actors.h"
 #include "automation_logic.h"
 #include <time.h>
+#include "configuration.h"
 
 static const char *TAG = "MAIN";
 
@@ -65,7 +66,6 @@ void print_system_information() {
 void sensors_actors_main_task(void *pvParameter) {
 	init_sensors();
 
-
 	while (1) {
 		sensors_reading_t sensors_reading;
 		esp_err_t sensors_ok = get_seasors_reading(&sensors_reading);
@@ -90,6 +90,7 @@ void sensors_actors_main_task(void *pvParameter) {
 
 void app_main() {
 	ESP_ERROR_CHECK(nvs_flash_init());
+	init_configuration();
 	initialise_wifi();
 	ESP_LOGI(TAG, "Starting tasks");
 	xTaskCreate(&print_system_information, "print_system_information",
