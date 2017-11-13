@@ -10,3 +10,6 @@ const char HTTP_FORM_END[]         = "<br/><button type='submit'>save</button></
 const char HTTP_SCAN_LINK[]        = "<br/><div class=\"c\"><a href=\"/wifi\">Scan</a></div>";
 const char HTTP_SAVED[]            = "<div>Credentials Saved<br/>Trying to connect ESP to network.<br/>If it fails reconnect to AP to try again</div>";
 const char HTTP_END[]              = "</div></body></html>";
+
+extern const uint8_t config_html_gz_start[] asm("_binary_config_html_gz_start");
+extern const uint8_t config_html_gz_end[] asm("_binary_config_html_gz_end");

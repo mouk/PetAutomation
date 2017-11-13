@@ -18,4 +18,13 @@
 esp_err_t process_sensors_reading(sensors_reading_t *sensors, actors_state_t *actors) ;
 
 
+typedef struct {
+	sensors_reading_t *sensors;
+	actors_state_t *actors;
+}sensor_actor_status_t;
+
+
+
+sensor_actor_status_t get_last_status();
+
 #endif /* MAIN_INCLUDE_AUTOMATION_LOGIC_H_ */

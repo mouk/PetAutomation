@@ -10,11 +10,44 @@
 #include "string.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
+#include "automation_logic.h"
 
 #define MONTHS 12
 
 
 static char *KEY = "config";
+
+char *serialize_status(void) {
+
+	sensor_actor_status_t status =get_last_status();
+
+	cJSON *root = cJSON_CreateObject();
+	if(status.sensors != NULL){
+		cJSON *a = cJSON_CreateArray();
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.sensors->temp_reading_1));
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.sensors->temp_reading_2));
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.sensors->temp_reading_3));
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.sensors->temp_reading_4));
+		cJSON_AddItemToObject(root, "temp_sensors", a);
+		cJSON_AddNumberToObject(root, "brightness", status.sensors->brightness);
+		cJSON_AddNumberToObject(root, "sensors_timestamp", status.sensors->timestamp);
+	}
+
+	if(status.actors != NULL){
+
+		cJSON *a = cJSON_CreateArray();
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.actors->relay_state_1));
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.actors->relay_state_2));
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.actors->relay_state_3));
+		cJSON_AddItemToArray(a, cJSON_CreateNumber(status.actors->relay_state_4));
+		cJSON_AddItemToObject(root, "relays", a);
+	}
+	char* json_unformatted;
+	json_unformatted = cJSON_PrintUnformatted(root);
+	cJSON_Delete(root);
+	return json_unformatted;
+}
+
 month_config_t *get_configuration(void) {
 	static month_config_t configs[MONTHS] = { { 0, 0, 0, 6 }, //jan
 			{ 0, 0, 0, 6 }, //feb

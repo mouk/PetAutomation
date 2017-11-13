@@ -1,0 +1,16 @@
+{
+    "temp_sensors": [
+        20,
+        0,
+        0,
+        0
+    ],
+    "brightness": 20,
+    "sensors_timestamp": 1510516869,
+    "relays": [
+        0,
+        1,
+        0,
+        0
+    ]
+}

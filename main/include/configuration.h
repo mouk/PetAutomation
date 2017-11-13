@@ -22,5 +22,6 @@ month_config_t *get_configuration(void);
 char *serialize_configuration(void);
 esp_err_t update_configuration_from_json(const char * buffer, const size_t len);
 esp_err_t persist_config();
+char *serialize_status(void);
 
 #endif /* MAIN_INCLUDE_CONFIGURATION_H_ */

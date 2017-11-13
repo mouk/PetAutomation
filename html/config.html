@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <link rel="icon" href="../../favicon.ico">
+
+  <title>Navbar Template for Bootstrap 3.3.5 Documentation - BootstrapDocs</title>
+
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+  <!-- Custom styles for this template -->
+  <style>
+  body {
+    padding-bottom: 20px;
+  }
+
+  .navbar {
+    margin-bottom: 20px;
+  }
+  </style>
+</head>
+
+<body>
+
+  <div class="container"  id="app">
+
+    <!-- Static navbar -->
+    <nav class="navbar navbar-default">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false"
+            aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Pet Automation</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li v-bind:class="{ active: isHome }">
+              <a href="#/" @click="setPage('home')">Home</a>
+            </li>
+            <li v-bind:class="{ active: isConfig }">
+              <a href="#/config" @click="setPage('config')">Configuration</a>
+            </li>
+          </ul>
+        </div>
+        <!--/.nav-collapse -->
+      </div>
+      <!--/.container-fluid -->
+    </nav>
+
+    <!-- Main component for a primary marketing message or call to action -->
+
+    <div class="jumbotron">
+      <div  v-if="isHome">
+        <h1>System status</h1>
+        <h5>Last update at {{timestamp}}</h5>
+        <h2>Temperature sensors</h2>
+        <ul class="list-group">
+          <li class="list-group-item" v-for="(s, index) in status.temp_sensors">Sensor {{index}} <span class="label label-default">{{s}} °</span> Celsius</li>
+        </ul>
+
+        <h2>Brightness</h2>
+        <ul class="list-group">
+          <li class="list-group-item">Brightness <span class="label label-default">{{status.brightness}} %</span></li>
+        </ul>
+
+        <h2>Relays</h2>
+        <ul class="list-group">
+          <li class="list-group-item" v-for="(s, index) in status.relays">Relay {{index}}&nbsp;
+            <span class="label label-default" v-if="!s">Off</span>
+              <span class="label label-primary" v-else>On</span>
+            </li>
+        </ul>
+      </div>
+      <div id="settings" v-if="isConfig">
+        <h1>Configuration</h1>
+        <div class="row">
+          <div class="col-sm-2 text-center"></div>
+          <div class="col-sm-1 text-center">Active</div>
+          <div class="col-sm-5 text-center">Lighting hours</div>
+          <div class="col-sm-3 text-center">Heating from</div>
+        </div>
+
+        <div v-for="(m, index) in lighting" class="row">
+          <div class="col-sm-2"><span  class="pull-right">{{months[index]}}</span></div>
+          <div class="col-sm-1">
+            <input type="checkbox" v-model="m.active">
+          </div>
+          <div class="col-sm-2">
+            <select v-model="m.start" v-if="m.active">
+              <option v-for="h in hours" v-bind:value="h.val">
+                {{ h.text }}
+              </option>
+            </select>
+          </div>
+          <div class="col-sm-1">
+              <div v-if="m.active">
+               to
+              </div>
+            </div>
+          <div class="col-sm-2">
+            <select v-model="m.end" v-if="m.active">
+              <option v-for="h in hours" v-bind:value="h.val">
+                {{ h.text }}
+              </option>
+            </select>
+          </div>
+          <div class="col-sm-3 text-center">
+            <select v-model="m.temp_threshold">
+              <option v-for="t in temps" v-bind:value="t">
+                {{ t }}°
+              </option>
+            </select>&nbsp;C
+          </div>
+        </div>
+        <br/>
+        <div class="form-group pull-right">
+            <a class="btn btn-danger" @click="getSettings"><i class="glyphicon glyphicon-remove"></i> Reset</a>&nbsp;&nbsp;&nbsp;
+            <a class="btn btn-success" @click="saveSettings"><i class="glyphicon glyphicon-ok"></i> Save</a>
+            <div class="col-sm-6"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  </div>
+  <!-- /container -->
+  <script src="https://unpkg.com/vue@latest/dist/vue.js"></script>
+  <script src="https://unpkg.com/axios@latest/dist/axios.min.js"></script>
+
+  <script>
+    const app = new Vue({
+      el: '#app',
+      data: {
+        page: window.location.hash,
+        lighting: [],
+        months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+          'November', 'December'
+        ],
+        temps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        status:{}
+      },
+      computed: {
+        isHome(){
+          return !this.page || this.page=='#' || this.page=='#/'|| this.page=='#/home'
+        },
+        isConfig(){
+          return this.page=='#/config'
+        },
+        hours: function () {
+          var h = []
+          for (i = 0; i < 24; i++) {
+            h.push({text: i , val: i});
+          }
+          return h;
+        },
+        timestamp(){
+          let epoch = this.status.sensors_timestamp
+          if(!epoch){
+            return null;
+          }
+          var d = new Date(0);
+          d.setUTCSeconds(epoch);
+          return d;
+        }
+      },
+      methods: {
+        setPage(p){
+          this.page = p;
+        },
+        getSettings: function () {
+          var app = this;
+          axios.get('/api/lighting')
+            .then(function (response) {
+              app.lighting = response.data;
+            })
+            .catch(function (error) {
+              alert(error);
+            })
+        },
+        saveSettings() {
+          var data = this.lighting;
+          if (data.length === 0){
+            return;
+          }
+          axios.post('/api/lighting', data)
+          .then(function (response) {
+            console.log(response);
+          })
+          .catch(function (error) {
+            console.log(error);
+          });
+        },
+        updateStatus(){
+          axios.get('/api/status')
+            .then(function (response) {
+              app.status = response.data;
+            })
+            .catch(function (error) {
+              console.log(error);
+            })
+          }
+      }
+    });
+    app.getSettings();
+    app.updateStatus();
+    setInterval(app.updateStatus, 60*1000);
+    window.addEventListener('popstate', () => {
+      app.page = window.location.hash
+    })
+  </script>
+
+</body>
+
+</html>

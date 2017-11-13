@@ -24,10 +24,19 @@
 static const char *TAG = "MONGOOSE";
 #define MG_LISTEN_ADDR "80"
 
-void http_serve_start_page(struct mg_connection *nc);
+static void http_serve_start_page(struct mg_connection *nc, int ev, void *ev_data);
 static void http_save_wifi_credentials(struct mg_connection *nc, int ev,
 		void *ev_data);
 static void api_handle_lighting(struct mg_connection *nc, int ev, void *ev_data);
+static void api_handle_status(struct mg_connection *nc, int ev, void *ev_data);
+
+
+static bool is_softAP(){
+	EventBits_t wifi_bits = xEventGroupWaitBits(event_group,
+			AP_CONNECTED_BIT,
+		false, false, 0);
+	return wifi_bits & AP_CONNECTED_BIT;
+}
 
 static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 
@@ -47,6 +56,7 @@ static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 		printf("HTTP request from %s: (%.*s) %.*s\n", addr,
 				(int) hm->method.len, hm->method.p, (int) hm->uri.len,
 				hm->uri.p);
+		/*
 		if (strncmp("POST", hm->method.p, hm->method.len)) {
 
 			ESP_LOGI(TAG, "GET");
@@ -55,6 +65,7 @@ static void mg_ev_handler(struct mg_connection *nc, int ev, void *p) {
 			ESP_LOGI(TAG, "POST");
 			http_serve_start_page(nc);
 		}
+		*/
 		break;
 	}
 	case MG_EV_SEND: {
@@ -85,6 +96,9 @@ void http_serve(void *pvParameters) {
 
 	mg_register_http_endpoint(nc, "/wifisave", http_save_wifi_credentials);
 	mg_register_http_endpoint(nc, "/api/lighting", api_handle_lighting);
+	mg_register_http_endpoint(nc, "/api/status", api_handle_status);
+	mg_register_http_endpoint(nc, "/", http_serve_start_page);
+
 	mg_set_protocol_http_websocket(nc);
 
 	/* Processing events */
@@ -101,9 +115,9 @@ static const char *json_fmt = "HTTP/1.0 200 OK\r\n"
 static const char *no_content = "HTTP/1.0 201 OK\r\n"
 		"Connection: close\r\n"
 		"\r\n";
-void http_serve_start_page(struct mg_connection *nc) {
-	//mg_printf_http_chunk(nc, "Error: %s", msg);
-	/* Send empty chunk, the end of response */
+
+static void http_serve_integration_page(struct mg_connection *nc) {
+
 	mg_printf(nc, "%s",
 			"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
 	mg_printf_http_chunk(nc, "%s %s %s %s %s %s %s", HTTP_HEAD, HTTP_STYLE,
@@ -111,6 +125,40 @@ void http_serve_start_page(struct mg_connection *nc) {
 			//HTTP_FORM_PARAM,
 			HTTP_FORM_END, HTTP_SAVED, HTTP_END);
 	mg_send_http_chunk(nc, "", 0);
+
+}
+
+static const char gzip_header[] = "Connection: close\r\n"
+		"Content-Type: text/html\r\n"
+		"Content-Encoding: gzip";
+static void http_get_config(struct mg_connection *nc, int ev, void *ev_data) {
+	ESP_LOGI(TAG, "Sending the config page");
+	mg_send_head(nc, 200, config_html_gz_end - config_html_gz_start,
+			gzip_header);
+	mg_send(nc, (void *) config_html_gz_start,
+			config_html_gz_end - config_html_gz_start);
+}
+static void http_serve_start_page(struct mg_connection *nc, int ev, void *ev_data) {
+	if (is_softAP()){
+		http_serve_integration_page(nc) ;
+	}else{
+		http_get_config(nc,ev,ev_data);
+	}
+}
+static void api_handle_status(struct mg_connection *nc, int ev, void *ev_data) {
+	ESP_LOGD(TAG, "api_handle_lighting");
+	struct http_message *hm = (struct http_message *) ev_data;
+	if (strncmp("GET", hm->method.p, hm->method.len)) {
+		//accept only GET
+		mg_send_head(nc, 404, 0, "Content-Type: text/plain");
+		nc->flags |= MG_F_SEND_AND_CLOSE;
+		return;
+	}
+	char *json = serialize_status();
+	mg_printf(nc, json_fmt, json);
+	nc->flags |= MG_F_SEND_AND_CLOSE;
+	free(json);
+
 }
 static void api_handle_lighting(struct mg_connection *nc, int ev, void *ev_data) {
 	ESP_LOGD(TAG, "api_handle_lighting");
@@ -128,7 +176,8 @@ static void api_handle_lighting(struct mg_connection *nc, int ev, void *ev_data)
 	if (strncmp("POST", hm->method.p, hm->method.len) == 0) {
 		printf("POST api_handle_lighting");
 
-		ESP_ERROR_CHECK(update_configuration_from_json(hm->body.p, hm->body.len));
+		ESP_ERROR_CHECK(
+				update_configuration_from_json(hm->body.p, hm->body.len));
 		ESP_ERROR_CHECK(persist_config());
 		mg_printf(nc, "%s", no_content);
 		nc->flags |= MG_F_SEND_AND_CLOSE;
@@ -176,3 +225,4 @@ static void http_save_wifi_credentials(struct mg_connection *nc, int ev,
 
 	esp_restart();
 }
+
