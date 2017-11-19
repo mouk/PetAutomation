@@ -1,0 +1,22 @@
+[
+    {
+        "ssid": "Amazing with a very long name",
+        "strength": 1
+    },
+    {
+        "ssid": "Very Good",
+        "strength": 2
+    },
+    {
+        "ssid": "Ok",
+        "strength": 3
+    },
+    {
+        "ssid": "Not Ok",
+        "strength": 4
+    },
+    {
+        "ssid": "Not Usable",
+        "strength": 5
+    }
+]

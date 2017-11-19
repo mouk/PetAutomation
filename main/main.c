@@ -91,12 +91,16 @@ void sensors_actors_main_task(void *pvParameter) {
 void app_main() {
 	ESP_ERROR_CHECK(nvs_flash_init());
 	init_configuration();
-	initialise_wifi();
+
 	ESP_LOGI(TAG, "Starting tasks");
+
+	xTaskCreate(&initialise_wifi, "initialise_wifi",
+				1024 * 4, NULL, 10, NULL);
+
+	xTaskCreate(&http_serve, "http_server", 1024 * 20, NULL, 5, NULL);
+
 	xTaskCreate(&print_system_information, "print_system_information",
 				1024 * 2, NULL, 1, NULL);
-
-	xTaskCreate(&http_serve, "http_server", 2048 * 10, NULL, 5, NULL);
 
 
 	xTaskCreate(&get_time, "get_time", configMINIMAL_STACK_SIZE * 5,
